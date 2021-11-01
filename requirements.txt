@@ -2,3 +2,4 @@ torch~=1.10.0
 sklearn
 jupyter
 matplotlib
+pandas
