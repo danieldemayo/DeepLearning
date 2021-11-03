@@ -1,5 +1,8 @@
 torch~=1.10.0
-sklearn
+sklearn~=0.0
 jupyter
-matplotlib
-pandas
+matplotlib~=3.4.3
+pandas~=1.3.4
+pydantic
+numpy~=1.21.3
+scikit-learn~=1.0.1
