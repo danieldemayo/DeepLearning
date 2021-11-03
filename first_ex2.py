@@ -34,6 +34,13 @@ def generate_data(seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return xx, yy, z
 
 
+def vectorize_data(x, y, z):
+    xx = x.ravel().reshape(-1, 1)
+    yy = y.ravel().reshape(-1, 1)
+    input_data = np.hstack((xx, yy))
+    return input_data, z.reshape(-1, 1)
+
+
 def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
     plt.figure()
     ax = plt.axes(projection='3d')
@@ -95,7 +102,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
 
         losses.append(loss.item())
         predictions.append(y_pred.detach().numpy())
-        #todo: roc_auc_score
+        # todo: roc_auc_score
         fpr, tpr, threshold = roc_curve(y_train, predictions[epoch])
         aucs.append(auc(fpr, tpr))
         if (epoch + 1) % 100 == 0:
@@ -156,8 +163,12 @@ def viz_overfit(data):
 
 
 def main():
-    triple = generate_data()
-    viz_data(*triple)
+    data = generate_data()
+    viz_data(*data)
+    v_data = vectorize_data(*data)
+    reg_model = RegressionModel(2, [5, 3])
+    X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
+                                        train_test_split(*v_data, test_size=0.3)]
 
 
 if __name__ == '__main__':
