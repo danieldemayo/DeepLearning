@@ -23,13 +23,24 @@ from matplotlib import cm
 
 # **Generate data:**
 
-def generate_data(seed: int = 0) -> np.ndarray:
+def generate_data(seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     np.random.seed(seed)
     x = np.linspace(-5, 5, 30)
     y = np.linspace(-5, 5, 30)
     xx, yy = np.meshgrid(x, y)
     z = np.sin(xx) * np.cos(yy) + 0.1 * np.random.rand(xx.shape[0], xx.shape[1])
-    return z
+    return xx, yy, z
+
+
+def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
+    plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.contour3D(x, y, z, 50, cmap='binary')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.view_init(60, 35)
+    plt.show()
 
 
 # **Define the Model:**
@@ -55,7 +66,7 @@ def viz(data: np.ndarray):
     pass
 
 
-### Build a new neural network and try overfitting your training set
+# Build a new neural network and try overfitting your training set
 
 
 # **Generate data:**
@@ -87,3 +98,12 @@ def viz_overfit(data):
 5. Briefly explain graph's results.
 6. How does your metric value differs between the training data and the test data and why?
 """
+
+
+def main():
+    triple = generate_data()
+    viz_data(*triple)
+
+
+if __name__ == '__main__':
+    main()
