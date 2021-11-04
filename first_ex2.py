@@ -17,7 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 from torch import nn, from_numpy, Tensor
 from torch.autograd import Variable
-from sklearn.metrics import mean_squared_error, roc_curve, auc, roc_auc_score, RocCurveDisplay
+from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from torch.optim import SGD
@@ -100,7 +100,7 @@ model_conf = {
 def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) -> tuple[nn.Module, list]:
     losses = []
     predictions = []
-    aucs = []
+    mses = []
     criterion = conf['loss_function']()
     optimizer = conf['optimizer'](model.parameters(), lr=conf['lr'], momentum=conf['momentum'])
 
@@ -113,44 +113,26 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
 
         losses.append(loss.item())
         predictions.append(y_pred)
-        # todo: roc_auc_score
-        fpr, tpr, threshold = roc_curve(y_train, predictions[epoch])
-        aucs.append(auc(fpr, tpr))
+        mse = mean_squared_error(y_train.detach().numpy(), y_pred.detach().numpy())
+        mses.append(mse)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
 
-    scores = [losses, predictions, aucs]
+    scores = [losses, predictions, mses]
     return model, scores
 
 
 def validate_model(model: nn.Module, x_test, y_test):
     y_pred = model(x_test)
-    fpr, tpr, threshold = roc_curve(y_test.detach().numpy(), y_pred.detach().numpy())
-    roc_auc = auc(fpr, tpr)
-    print(roc_auc)
-    roc_curve_display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-    roc_curve_display.plot()
-    return roc_curve_display
+    mse = mean_squared_error(y_test.detach().numpy(), y_pred.detach().numpy())
+    print(mse)
+    return mse
 
 
 # **Visualizing the plots:**
 
-# train or test? need to define it in the function what we want or we just want to do it on test data?
-# danield: the function can take any data, later we pass it as train and as test
-def viz_decision_boundary(model: nn.Module, x: Tensor, y: Tensor):
-    xx, yy = grid((min(x[:, 0]), max(x[:, 0])), (min(x[:, 1]), max(x[:, 1])))
-    plane, _ = vectorize_data(xx, yy, np.ndrray())
-    pred_func = model.forward(plane)
-    z: NDArray = pred_func.view(xx.shape).detach().numpy()
-    binary_z = np.where(z >= 0.5, 1, 0)
-    plt.contourf(xx, yy, z, cmap='RdBu')
-    plt.ylabel('x2')
-    plt.xlabel('x1')
-    plt.scatter(x[:, 0], x[:, 1], c=y, cmap='Paired', s=6)
 
-
-kw = {'title': 'Epochs Vs. AUCs', 'x_label': 'Epochs', 'y_label': 'AUC', }
-kw2 = {'title': 'Epochs Vs. Training Loss', 'x_label': 'Epochs', 'y_label': 'Training Loss', }
+kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE', }
 
 
 def viz_epochs(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
@@ -218,6 +200,7 @@ def main():
                                         train_test_split(*v_data, test_size=0.3)]
     trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train)
     validate_model(trained_model, X_test, y_test)
+    viz_epochs(model_conf['num_of_epochs'], tr_scores[2], **kw)
 
     ## overfit part
     # reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
