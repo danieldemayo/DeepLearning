@@ -14,6 +14,7 @@ Then, build your neural networks and find the architecture which gives you the b
 """
 
 import numpy as np
+from numpy.typing import NDArray
 from torch import nn, from_numpy, Tensor
 from torch.autograd import Variable
 from sklearn.metrics import mean_squared_error, roc_curve, auc, roc_auc_score, RocCurveDisplay
@@ -22,15 +23,25 @@ from matplotlib import cm
 from torch.optim import SGD
 from sklearn.model_selection import train_test_split
 
+np.random.seed(0)
+
 
 # **Generate data:**
 
-def generate_data(seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    np.random.seed(seed)
-    x = np.linspace(-5, 5, 30)
-    y = np.linspace(-5, 5, 30)
+def grid(scale_x: tuple[int, int], scale_y: tuple[int, int]) -> tuple[NDArray, NDArray]:
+    x = np.linspace(*scale_x, 30)
+    y = np.linspace(*scale_y, 30)
     xx, yy = np.meshgrid(x, y)
-    z = np.sin(xx) * np.cos(yy) + 0.1 * np.random.rand(xx.shape[0], xx.shape[1])
+    return xx, yy
+
+
+def trigo_function(x1, x2):
+    return np.sin(x1) * np.cos(x2) + 0.1 * np.random.rand(x1.shape[0], x1.shape[1])
+
+
+def generate_data() -> tuple[NDArray, NDArray, NDArray]:
+    xx, yy = grid((-5, 5), (-5, 5))
+    z = trigo_function(xx, yy)
     return xx, yy, z
 
 
@@ -41,7 +52,7 @@ def vectorize_data(x, y, z):
     return input_data, z.reshape(-1, 1)
 
 
-def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
+def viz_data(x: NDArray, y: NDArray, z: NDArray):
     plt.figure()
     ax = plt.axes(projection='3d')
     ax.contour3D(x, y, z, 50, cmap='binary')
@@ -52,7 +63,7 @@ def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
     plt.show()
 
 
-def convert_to_tensor(array: np.ndarray):
+def convert_to_tensor(array: NDArray):
     return from_numpy(array.astype(np.float32))
 
 
@@ -69,7 +80,7 @@ class RegressionModel(nn.Module):
         self.relu = nn.ReLU()
         self.sig = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         x = self.relu(self.lin1(x))
         x = self.sig(self.lin2(x))
         x = self.sig(self.lin3(x))
@@ -101,7 +112,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
         optimizer.zero_grad()
 
         losses.append(loss.item())
-        predictions.append(y_pred.detach().numpy())
+        predictions.append(y_pred)
         # todo: roc_auc_score
         fpr, tpr, threshold = roc_curve(y_train, predictions[epoch])
         aucs.append(auc(fpr, tpr))
@@ -125,61 +136,36 @@ def validate_model(model: nn.Module, x_test, y_test):
 # **Visualizing the plots:**
 
 # train or test? need to define it in the function what we want or we just want to do it on test data?
+# danield: the function can take any data, later we pass it as train and as test
 def viz_decision_boundary(model: nn.Module, x: Tensor, y: Tensor):
-    x_range = np.linspace(min(x[:, 0]), max(x[:, 0]))
-    y_range = np.linspace(min(x[:, 1]), max(x[:, 1]))
-    xx, yy = np.meshgrid(x_range, y_range)
-    grid = Tensor(np.c_[xx.ravel(), yy.ravel()])
-    pred_func = model.forward(grid)
-    z = pred_func.view(xx.shape).detach().numpy()
-    z[z >= 0.5] = 1
-    z[z < 0.5] = 0
+    xx, yy = grid((min(x[:, 0]), max(x[:, 0])), (min(x[:, 1]), max(x[:, 1])))
+    plane, _ = vectorize_data(xx, yy, np.ndrray())
+    pred_func = model.forward(plane)
+    z: NDArray = pred_func.view(xx.shape).detach().numpy()
+    binary_z = np.where(z >= 0.5, 1, 0)
     plt.contourf(xx, yy, z, cmap='RdBu')
     plt.ylabel('x2')
     plt.xlabel('x1')
-    plt.scatter(x[:, 0], x[:, 1], c=y, cmap='Paired', s=6
-                )
+    plt.scatter(x[:, 0], x[:, 1], c=y, cmap='Paired', s=6)
 
 
-def viz_losses_epochs(epochs: list, losses: list):
-    plt.plot(epochs, losses)
-    plt.title('Epochs Vs. Training Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Training Loss')
+kw = {'title': 'Epochs Vs. AUCs', 'x_label': 'Epochs', 'y_label': 'AUC', }
+kw2 = {'title': 'Epochs Vs. Training Loss', 'x_label': 'Epochs', 'y_label': 'Training Loss', }
+
+
+def viz_epochs(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
+    epochs = list(range(num_of_epochs))
+    plt.plot(epochs, other_axis)
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
     plt.legend()
     plt.show()
-
-
-def viz_auc_epochs(epochs: list, aucs_train: list, aucs_test: list):
-    plt.plot(epochs, aucs_train)
-    plt.plot(epochs, aucs_test)
-    plt.title('Epochs Vs. AUCs')
-    plt.xlabel('Epochs')
-    plt.ylabel('AUC')
-    plt.legend()
-    plt.show()
-
-
-def viz_fpr_tpr_curve(fpr, tpr, roc_auc):
-    roc_curve_display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-    roc_curve_display.plot()
-
-
-def viz(data: np.ndarray):
-    viz_losses_epochs
-    viz_auc_epochs
-    viz_fpr_tpr_curve
-    viz_decision_boundary
 
 
 # Build a new neural network and try overfitting your training set
 
-
 # **Generate data:**
-
-def generate_data_overfit():
-    return generate_data()
-
 
 # **Define the Model:**
 
@@ -213,18 +199,9 @@ model_conf_overfit = {
     'num_of_epochs': 6000,
 }
 
-
 # **Training and validation:**
 
-def train_overfit(model: nn.Module) -> nn.Module:
-    return train_model(model=model)
-
-
 # **Visualizing the plots:**
-
-def viz_overfit(data):
-    return viz(data)
-
 
 """
 5. Briefly explain graph's results.
@@ -239,9 +216,11 @@ def main():
     reg_model = RegressionModel(2, [5, 3])
     X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
                                         train_test_split(*v_data, test_size=0.3)]
-    tr_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train)
+    trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train)
+    validate_model(trained_model, X_test, y_test)
+
     ## overfit part
-    reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
+    # reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
 
 
 if __name__ == '__main__':
