@@ -124,8 +124,54 @@ def validate_model(model: nn.Module, x_test, y_test):
 
 # **Visualizing the plots:**
 
+# train or test? need to define it in the function what we want or we just want to do it on test data?
+def viz_decision_boundary(model: nn.Module,x: Tensor, y: Tensor):
+    x_range = np.linspace(min(x[:, 0]), max(x[:, 0]))
+    y_range = np.linspace(min(x[:, 1]), max(x[:, 1]))
+    xx, yy = np.meshgrid(x_range, y_range)
+    grid = Tensor(np.c_[xx.ravel(), yy.ravel()])
+    pred_func = model.forward(grid)
+    z = pred_func.view(xx.shape).detach().numpy()
+    z[z >= 0.5] = 1
+    z[z < 0.5] = 0
+    plt.contourf(xx, yy, z, cmap='RdBu')
+    plt.ylabel('x2')
+    plt.xlabel('x1')
+    plt.scatter(x[:, 0], x[:, 1], c=y, cmap='Paired', s=6
+                )
+
+
+def viz_losses_epochs(epochs: list, losses: list):
+    plt.plot(epochs, losses)
+    plt.title('Epochs Vs. Training Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Training Loss')
+    plt.legend()
+    plt.show()
+
+
+def viz_auc_epochs(epochs: list, aucs_train: list, aucs_test: list):
+    plt.plot(epochs, aucs_train)
+    plt.plot(epochs, aucs_test)
+    plt.title('Epochs Vs. AUCs')
+    plt.xlabel('Epochs')
+    plt.ylabel('AUC')
+    plt.legend()
+    plt.show()
+
+
+def viz_fpr_tpr_curve(fpr, tpr, roc_auc):
+    roc_curve_display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
+    roc_curve_display.plot()
+
+
 def viz(data: np.ndarray):
-    pass
+    viz_losses_epochs
+    viz_auc_epochs
+    viz_fpr_tpr_curve
+    viz_decision_boundary
+
+
 
 
 # Build a new neural network and try overfitting your training set
@@ -140,8 +186,34 @@ def generate_data_overfit():
 # **Define the Model:**
 
 class OverfitModel(nn.Module):
-    def __init__(self):
+    def __init__(self, num_inputs: int, num_neurons: list):
         super().__init__()
+        self.lin1 = nn.Linear(num_inputs, num_neurons[0])
+        self.lin2 = nn.Linear(num_neurons[0], num_neurons[1])
+        self.lin3 = nn.Linear(num_neurons[1], num_neurons[2])
+        self.lin4 = nn.Linear(num_neurons[2], num_neurons[3])
+        self.lin5 = nn.Linear(num_neurons[3], 1)
+
+        self.relu = nn.ReLU()
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.relu(self.lin1(x))
+        x = self.relu(self.lin2(x))
+        x = self.sig(self.lin3(x))
+        x = self.relu(self.lin4(x))
+        x = self.sig(self.lin5(x))
+        return x
+
+
+# **Training and validation:**
+model_conf_overfit = {
+    'loss_function': nn.MSELoss,
+    'optimizer': SGD,
+    'lr': 0.1,
+    'momentum': 0.9,
+    'num_of_epochs': 6000,
+}
 
 
 # **Training and validation:**
@@ -169,6 +241,10 @@ def main():
     reg_model = RegressionModel(2, [5, 3])
     X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
                                         train_test_split(*v_data, test_size=0.3)]
+    tr_model, tr_scores = train_model(reg_model,model_conf,x_train=X_train,y_train=y_train)
+    ## overfit part
+    reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
+
 
 
 if __name__ == '__main__':
