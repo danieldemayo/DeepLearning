@@ -201,6 +201,10 @@ def main():
     trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train)
     validate_model(trained_model, X_test, y_test)
     viz_epochs(model_conf['num_of_epochs'], tr_scores[2], **kw)
+    y_pred = trained_model(X_test)
+
+    viz_data(X_test[:, 0], X_test[:, 1], y_test)
+    viz_data(X_test[:, 0], X_test[:, 1], y_pred)
 
     ## overfit part
     # reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
