@@ -125,7 +125,7 @@ def validate_model(model: nn.Module, x_test, y_test):
 # **Visualizing the plots:**
 
 # train or test? need to define it in the function what we want or we just want to do it on test data?
-def viz_decision_boundary(model: nn.Module,x: Tensor, y: Tensor):
+def viz_decision_boundary(model: nn.Module, x: Tensor, y: Tensor):
     x_range = np.linspace(min(x[:, 0]), max(x[:, 0]))
     y_range = np.linspace(min(x[:, 1]), max(x[:, 1]))
     xx, yy = np.meshgrid(x_range, y_range)
@@ -170,8 +170,6 @@ def viz(data: np.ndarray):
     viz_auc_epochs
     viz_fpr_tpr_curve
     viz_decision_boundary
-
-
 
 
 # Build a new neural network and try overfitting your training set
@@ -241,10 +239,9 @@ def main():
     reg_model = RegressionModel(2, [5, 3])
     X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
                                         train_test_split(*v_data, test_size=0.3)]
-    tr_model, tr_scores = train_model(reg_model,model_conf,x_train=X_train,y_train=y_train)
+    tr_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train)
     ## overfit part
     reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
-
 
 
 if __name__ == '__main__':
