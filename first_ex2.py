@@ -14,23 +14,35 @@ Then, build your neural networks and find the architecture which gives you the b
 """
 
 import numpy as np
+import torch
+from numpy.typing import NDArray
 from torch import nn, from_numpy, Tensor
 from torch.autograd import Variable
-from sklearn.metrics import mean_squared_error, roc_curve, auc, roc_auc_score, RocCurveDisplay
+from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from torch.optim import SGD
 from sklearn.model_selection import train_test_split
 
+np.random.seed(0)
+
 
 # **Generate data:**
 
-def generate_data(seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    np.random.seed(seed)
-    x = np.linspace(-5, 5, 30)
-    y = np.linspace(-5, 5, 30)
+def grid(scale_x: tuple([int, int]), scale_y: tuple([int, int])) -> tuple([NDArray, NDArray]):
+    x = np.linspace(*scale_x, 30)
+    y = np.linspace(*scale_y, 30)
     xx, yy = np.meshgrid(x, y)
-    z = np.sin(xx) * np.cos(yy) + 0.1 * np.random.rand(xx.shape[0], xx.shape[1])
+    return xx, yy
+
+
+def trigo_function(x1, x2):
+    return np.sin(x1) * np.cos(x2) + 0.1 * np.random.rand(x1.shape[0], x1.shape[1])
+
+
+def generate_data() -> tuple([NDArray, NDArray, NDArray]):
+    xx, yy = grid((-5, 5), (-5, 5))
+    z = trigo_function(xx, yy)
     return xx, yy, z
 
 
@@ -41,7 +53,7 @@ def vectorize_data(x, y, z):
     return input_data, z.reshape(-1, 1)
 
 
-def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
+def viz_data(x: NDArray, y: NDArray, z: NDArray):
     plt.figure()
     ax = plt.axes(projection='3d')
     ax.contour3D(x, y, z, 50, cmap='binary')
@@ -52,7 +64,7 @@ def viz_data(x: np.ndarray, y: np.ndarray, z: np.ndarray):
     plt.show()
 
 
-def convert_to_tensor(array: np.ndarray):
+def convert_to_tensor(array: NDArray):
     return from_numpy(array.astype(np.float32))
 
 
@@ -69,7 +81,7 @@ class RegressionModel(nn.Module):
         self.relu = nn.ReLU()
         self.sig = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         x = self.relu(self.lin1(x))
         x = self.sig(self.lin2(x))
         x = self.sig(self.lin3(x))
@@ -86,10 +98,11 @@ model_conf = {
 }
 
 
-def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) -> tuple[nn.Module, list]:
+def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, x_test: Tensor, y_test: Tensor) -> tuple([nn.Module, list]):
     losses = []
     predictions = []
-    aucs = []
+    mses = []
+    test_mses = []
     criterion = conf['loss_function']()
     optimizer = conf['optimizer'](model.parameters(), lr=conf['lr'], momentum=conf['momentum'])
 
@@ -101,87 +114,69 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
         optimizer.zero_grad()
 
         losses.append(loss.item())
-        predictions.append(y_pred.detach().numpy())
-        # todo: roc_auc_score
-        fpr, tpr, threshold = roc_curve(y_train, predictions[epoch])
-        aucs.append(auc(fpr, tpr))
+        predictions.append(y_pred)
+        mse = mean_squared_error(y_train.detach().numpy(), y_pred.detach().numpy())
+        mses.append(mse)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
 
-    scores = [losses, predictions, aucs]
+        _, test_mse = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion)
+        test_mses.append(test_mse)
+
+    scores = [losses, predictions, mses, test_mses]
     return model, scores
+
+
+def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> tuple([nn.Module, list]):
+    model.eval()
+
+    with torch.no_grad():
+        y_pred = model(x_test)
+        loss = loss_fn(y_pred, y_test)
+
+    return model, loss
 
 
 def validate_model(model: nn.Module, x_test, y_test):
     y_pred = model(x_test)
-    fpr, tpr, threshold = roc_curve(y_test.detach().numpy(), y_pred.detach().numpy())
-    roc_auc = auc(fpr, tpr)
-    print(roc_auc)
-    roc_curve_display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-    roc_curve_display.plot()
-    return roc_curve_display
+    mse = mean_squared_error(y_test.detach().numpy(), y_pred.detach().numpy())
+    print(mse)
+    return mse
 
 
 # **Visualizing the plots:**
 
-# train or test? need to define it in the function what we want or we just want to do it on test data?
-def viz_decision_boundary(model: nn.Module,x: Tensor, y: Tensor):
-    x_range = np.linspace(min(x[:, 0]), max(x[:, 0]))
-    y_range = np.linspace(min(x[:, 1]), max(x[:, 1]))
-    xx, yy = np.meshgrid(x_range, y_range)
-    grid = Tensor(np.c_[xx.ravel(), yy.ravel()])
-    pred_func = model.forward(grid)
-    z = pred_func.view(xx.shape).detach().numpy()
-    z[z >= 0.5] = 1
-    z[z < 0.5] = 0
-    plt.contourf(xx, yy, z, cmap='RdBu')
-    plt.ylabel('x2')
-    plt.xlabel('x1')
-    plt.scatter(x[:, 0], x[:, 1], c=y, cmap='Paired', s=6
-                )
+
+kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE'}
 
 
-def viz_losses_epochs(epochs: list, losses: list):
-    plt.plot(epochs, losses)
-    plt.title('Epochs Vs. Training Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Training Loss')
+def viz_epochs(num_of_epochs: int, other_axis: list, plot_test: bool, title: str, x_label: str, y_label: str):
+    epochs = list(range(num_of_epochs))
+    plt.plot(epochs, other_axis[0], 'orange', label='Train MSEs')
+    if plot_test:
+        plt.plot(epochs, other_axis[1], 'blue', label='Test MSEs', linestyle='--')
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.ylim([0.22, 0.28])
     plt.legend()
     plt.show()
 
 
-def viz_auc_epochs(epochs: list, aucs_train: list, aucs_test: list):
-    plt.plot(epochs, aucs_train)
-    plt.plot(epochs, aucs_test)
-    plt.title('Epochs Vs. AUCs')
-    plt.xlabel('Epochs')
-    plt.ylabel('AUC')
-    plt.legend()
-    plt.show()
-
-
-def viz_fpr_tpr_curve(fpr, tpr, roc_auc):
-    roc_curve_display = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc)
-    roc_curve_display.plot()
-
-
-def viz(data: np.ndarray):
-    viz_losses_epochs
-    viz_auc_epochs
-    viz_fpr_tpr_curve
-    viz_decision_boundary
-
-
+# def viz_epochs2(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
+#     epochs = list(range(num_of_epochs))
+#     plt.plot(epochs, other_axis)
+#     plt.plot(epochs, other_axis)
+#     plt.title(title)
+#     plt.xlabel(x_label)
+#     plt.ylabel(y_label)
+#     plt.legend()
+#     plt.show()
 
 
 # Build a new neural network and try overfitting your training set
 
-
 # **Generate data:**
-
-def generate_data_overfit():
-    return generate_data()
-
 
 # **Define the Model:**
 
@@ -191,18 +186,16 @@ class OverfitModel(nn.Module):
         self.lin1 = nn.Linear(num_inputs, num_neurons[0])
         self.lin2 = nn.Linear(num_neurons[0], num_neurons[1])
         self.lin3 = nn.Linear(num_neurons[1], num_neurons[2])
-        self.lin4 = nn.Linear(num_neurons[2], num_neurons[3])
-        self.lin5 = nn.Linear(num_neurons[3], 1)
+        self.lin4 = nn.Linear(num_neurons[2], 1)
 
         self.relu = nn.ReLU()
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
         x = self.relu(self.lin1(x))
-        x = self.relu(self.lin2(x))
+        x = self.sig(self.lin2(x))
         x = self.sig(self.lin3(x))
-        x = self.relu(self.lin4(x))
-        x = self.sig(self.lin5(x))
+        x = self.sig(self.lin4(x))
         return x
 
 
@@ -212,21 +205,12 @@ model_conf_overfit = {
     'optimizer': SGD,
     'lr': 0.1,
     'momentum': 0.9,
-    'num_of_epochs': 6000,
+    'num_of_epochs': 10000,
 }
-
 
 # **Training and validation:**
 
-def train_overfit(model: nn.Module) -> nn.Module:
-    return train_model(model=model)
-
-
 # **Visualizing the plots:**
-
-def viz_overfit(data):
-    return viz(data)
-
 
 """
 5. Briefly explain graph's results.
@@ -235,16 +219,27 @@ def viz_overfit(data):
 
 
 def main():
+    torch.manual_seed(1202)
     data = generate_data()
     viz_data(*data)
     v_data = vectorize_data(*data)
-    reg_model = RegressionModel(2, [5, 3])
+    reg_model = RegressionModel(2, [3, 3])
     X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
                                         train_test_split(*v_data, test_size=0.3)]
-    tr_model, tr_scores = train_model(reg_model,model_conf,x_train=X_train,y_train=y_train)
-    ## overfit part
-    reg_overfit_model = OverfitModel(2, [5, 3, 10, 15])
+    trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train,x_test=X_test,y_test=y_test)
 
+    viz_epochs(model_conf['num_of_epochs'], [tr_scores[2], tr_scores[3]], plot_test=True, **kw)
+    # y_pred = trained_model(X_test)
+
+    # viz_data(X_test[:, 0], X_test[:, 1], y_test)
+    # viz_data(X_test[:, 0], X_test[:, 1], y_pred)
+
+    ## overfit part
+    reg_overfit_model = OverfitModel(2, [5, 5, 5])
+    trained_model_overfit, tr_scores_overfit = train_model(reg_overfit_model, model_conf_overfit, x_train=X_train, y_train=y_train, x_test=X_test,
+                                           y_test=y_test)
+
+    viz_epochs(model_conf_overfit['num_of_epochs'], [tr_scores_overfit[2], tr_scores_overfit[3]], plot_test=True, **kw)
 
 
 if __name__ == '__main__':
