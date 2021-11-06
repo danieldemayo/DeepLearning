@@ -14,6 +14,7 @@ Then, build your neural networks and find the architecture which gives you the b
 """
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 from torch import nn, from_numpy, Tensor
 from torch.autograd import Variable
@@ -101,6 +102,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
     losses = []
     predictions = []
     mses = []
+    test_mses = []
     criterion = conf['loss_function']()
     optimizer = conf['optimizer'](model.parameters(), lr=conf['lr'], momentum=conf['momentum'])
 
@@ -118,8 +120,21 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
 
-    scores = [losses, predictions, mses]
+        _, test_mse = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion, )
+        test_mses.append(test_mse)
+
+    scores = [losses, predictions, mses, test_mses]
     return model, scores
+
+
+def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> tuple[nn.Module, list]:
+    model.eval()
+
+    with torch.no_grad():
+        y_pred = model(x_test)
+        loss = loss_fn(y_pred, y_test)
+
+    return model, loss
 
 
 def validate_model(model: nn.Module, x_test, y_test):
@@ -137,6 +152,17 @@ kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE', }
 
 def viz_epochs(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
     epochs = list(range(num_of_epochs))
+    plt.plot(epochs, other_axis)
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.legend()
+    plt.show()
+
+
+def viz_epochs2(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
+    epochs = list(range(num_of_epochs))
+    plt.plot(epochs, other_axis)
     plt.plot(epochs, other_axis)
     plt.title(title)
     plt.xlabel(x_label)
