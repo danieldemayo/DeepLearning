@@ -29,7 +29,7 @@ np.random.seed(0)
 
 # **Generate data:**
 
-def grid(scale_x: tuple[int, int], scale_y: tuple[int, int]) -> tuple[NDArray, NDArray]:
+def grid(scale_x: tuple([int, int]), scale_y: tuple([int, int])) -> tuple([NDArray, NDArray]):
     x = np.linspace(*scale_x, 30)
     y = np.linspace(*scale_y, 30)
     xx, yy = np.meshgrid(x, y)
@@ -40,7 +40,7 @@ def trigo_function(x1, x2):
     return np.sin(x1) * np.cos(x2) + 0.1 * np.random.rand(x1.shape[0], x1.shape[1])
 
 
-def generate_data() -> tuple[NDArray, NDArray, NDArray]:
+def generate_data() -> tuple([NDArray, NDArray, NDArray]):
     xx, yy = grid((-5, 5), (-5, 5))
     z = trigo_function(xx, yy)
     return xx, yy, z
@@ -119,7 +119,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor) 
         mses.append(mse)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
-
+    #asdaddasdas
         _, test_mse = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion, )
         test_mses.append(test_mse)
 
