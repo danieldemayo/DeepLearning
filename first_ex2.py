@@ -12,7 +12,7 @@ Then, build your neural networks and find the architecture which gives you the b
 4. Build a new neural network and try overfitting your training set. Show the overfitting by using learning curve plots.
     **Note**: You can use plt.ylim() function to better focus on the changes in the trends.
 """
-
+from typing import Callable
 import numpy as np
 import torch
 from numpy.typing import NDArray
@@ -29,7 +29,7 @@ np.random.seed(0)
 
 # **Generate data:**
 
-def grid(scale_x: tuple([int, int]), scale_y: tuple([int, int])) -> tuple([NDArray, NDArray]):
+def grid(scale_x: tuple[int, int], scale_y: tuple[int, int]) -> tuple[NDArray, NDArray]:
     x = np.linspace(*scale_x, 30)
     y = np.linspace(*scale_y, 30)
     xx, yy = np.meshgrid(x, y)
@@ -40,7 +40,7 @@ def trigo_function(x1, x2):
     return np.sin(x1) * np.cos(x2) + 0.1 * np.random.rand(x1.shape[0], x1.shape[1])
 
 
-def generate_data() -> tuple([NDArray, NDArray, NDArray]):
+def generate_data() -> tuple[NDArray, NDArray, NDArray]:
     xx, yy = grid((-5, 5), (-5, 5))
     z = trigo_function(xx, yy)
     return xx, yy, z
@@ -98,7 +98,8 @@ model_conf = {
 }
 
 
-def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, x_test: Tensor, y_test: Tensor) -> tuple([nn.Module, list]):
+def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, x_test: Tensor,
+                y_test: Tensor) -> tuple[nn.Module, list]:
     losses = []
     predictions = []
     mses = []
@@ -119,7 +120,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, 
         predictions.append(y_pred)
         mse = mean_squared_error(y_train.detach().numpy(), y_pred.detach().numpy())
         mses.append(mse)
-        r2_scores = mean_absolute_error(y_train.detach().numpy(), y_pred.detach().numpy()) #r2_score
+        r2_scores = mean_absolute_error(y_train.detach().numpy(), y_pred.detach().numpy())  # r2_score
         r2s.append(r2_scores)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
@@ -128,11 +129,11 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, 
         test_mses.append(test_mse)
         test_r2.append(r2)
 
-    scores = [losses, predictions, mses, test_mses, r2s,test_r2]
+    scores = [losses, predictions, mses, test_mses, r2s, test_r2]
     return model, scores
 
 
-def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> tuple([nn.Module, list]):
+def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> tuple[nn.Module, list]:
     model.eval()
 
     with torch.no_grad():
@@ -233,7 +234,8 @@ def main():
     reg_model = RegressionModel(2, [3, 3])
     X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
                                         train_test_split(*v_data, test_size=0.3)]
-    trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train,x_test=X_test,y_test=y_test)
+    trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train, x_test=X_test,
+                                           y_test=y_test)
 
     viz_epochs(model_conf['num_of_epochs'], [tr_scores[2], tr_scores[3]], plot_test=True, **kw)
     viz_epochs(model_conf['num_of_epochs'], [tr_scores[4], tr_scores[5]], plot_test=True, **kw)
@@ -244,8 +246,9 @@ def main():
 
     ## overfit part
     reg_overfit_model = OverfitModel(2, [5, 5, 5])
-    trained_model_overfit, tr_scores_overfit = train_model(reg_overfit_model, model_conf_overfit, x_train=X_train, y_train=y_train, x_test=X_test,
-                                           y_test=y_test)
+    trained_model_overfit, tr_scores_overfit = train_model(reg_overfit_model, model_conf_overfit, x_train=X_train,
+                                                           y_train=y_train, x_test=X_test,
+                                                           y_test=y_test)
 
     viz_epochs(model_conf_overfit['num_of_epochs'], [tr_scores_overfit[2], tr_scores_overfit[3]], plot_test=True, **kw)
 
