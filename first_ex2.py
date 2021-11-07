@@ -123,7 +123,7 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, 
         r2s.append(r2_scores)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
-
+        # validation usage
         _, test_mse, r2 = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion)
         test_mses.append(test_mse)
         test_r2.append(r2)
