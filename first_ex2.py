@@ -18,7 +18,7 @@ import torch
 from numpy.typing import NDArray
 from torch import nn, from_numpy, Tensor
 from torch.autograd import Variable
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from torch.optim import SGD
@@ -102,7 +102,9 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, 
     losses = []
     predictions = []
     mses = []
+    r2s = []
     test_mses = []
+    test_r2 = []
     criterion = conf['loss_function']()
     optimizer = conf['optimizer'](model.parameters(), lr=conf['lr'], momentum=conf['momentum'])
 
@@ -117,13 +119,16 @@ def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, 
         predictions.append(y_pred)
         mse = mean_squared_error(y_train.detach().numpy(), y_pred.detach().numpy())
         mses.append(mse)
+        r2_scores = mean_absolute_error(y_train.detach().numpy(), y_pred.detach().numpy()) #r2_score
+        r2s.append(r2_scores)
         if (epoch + 1) % 100 == 0:
             print('epoch:', epoch + 1, ',loss=', loss.item())
 
-        _, test_mse = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion)
+        _, test_mse, r2 = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion)
         test_mses.append(test_mse)
+        test_r2.append(r2)
 
-    scores = [losses, predictions, mses, test_mses]
+    scores = [losses, predictions, mses, test_mses, r2s,test_r2]
     return model, scores
 
 
@@ -133,8 +138,10 @@ def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSE
     with torch.no_grad():
         y_pred = model(x_test)
         loss = loss_fn(y_pred, y_test)
+    test_preds = y_pred.detach().numpy()
+    r2 = mean_absolute_error(y_test.detach().numpy(), test_preds)
 
-    return model, loss
+    return model, loss, r2
 
 
 def validate_model(model: nn.Module, x_test, y_test):
@@ -158,7 +165,7 @@ def viz_epochs(num_of_epochs: int, other_axis: list, plot_test: bool, title: str
     plt.title(title)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    plt.ylim([0.22, 0.28])
+    # plt.ylim([0.22, 0.28])
     plt.legend()
     plt.show()
 
@@ -229,6 +236,7 @@ def main():
     trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train,x_test=X_test,y_test=y_test)
 
     viz_epochs(model_conf['num_of_epochs'], [tr_scores[2], tr_scores[3]], plot_test=True, **kw)
+    viz_epochs(model_conf['num_of_epochs'], [tr_scores[4], tr_scores[5]], plot_test=True, **kw)
     # y_pred = trained_model(X_test)
 
     # viz_data(X_test[:, 0], X_test[:, 1], y_test)
