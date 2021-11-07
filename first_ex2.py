@@ -12,16 +12,15 @@ Then, build your neural networks and find the architecture which gives you the b
 4. Build a new neural network and try overfitting your training set. Show the overfitting by using learning curve plots.
     **Note**: You can use plt.ylim() function to better focus on the changes in the trends.
 """
-
+from typing import Tuple, List, Dict
 import numpy as np
-import torch
 from numpy.typing import NDArray
-from torch import nn, from_numpy, Tensor
+from torch import nn, from_numpy, Tensor, manual_seed, no_grad
 from torch.autograd import Variable
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from torch.optim import SGD
+from torch.optim import SGD, Optimizer
 from sklearn.model_selection import train_test_split
 
 np.random.seed(0)
@@ -29,7 +28,7 @@ np.random.seed(0)
 
 # **Generate data:**
 
-def grid(scale_x: tuple([int, int]), scale_y: tuple([int, int])) -> tuple([NDArray, NDArray]):
+def grid(scale_x: Tuple[int, int], scale_y: Tuple[int, int]) -> Tuple[NDArray, NDArray]:
     x = np.linspace(*scale_x, 30)
     y = np.linspace(*scale_y, 30)
     xx, yy = np.meshgrid(x, y)
@@ -40,7 +39,7 @@ def trigo_function(x1, x2):
     return np.sin(x1) * np.cos(x2) + 0.1 * np.random.rand(x1.shape[0], x1.shape[1])
 
 
-def generate_data() -> tuple([NDArray, NDArray, NDArray]):
+def generate_data() -> Tuple[NDArray, NDArray, NDArray]:
     xx, yy = grid((-5, 5), (-5, 5))
     z = trigo_function(xx, yy)
     return xx, yy, z
@@ -72,7 +71,7 @@ def convert_to_tensor(array: NDArray):
 
 
 class RegressionModel(nn.Module):
-    def __init__(self, num_inputs: int, num_neurons: list):
+    def __init__(self, num_inputs: int, num_neurons: List):
         super().__init__()
         self.lin1 = nn.Linear(num_inputs, num_neurons[0])
         self.lin2 = nn.Linear(num_neurons[0], num_neurons[1])
@@ -89,59 +88,51 @@ class RegressionModel(nn.Module):
 
 
 # **Training and validation:**
-model_conf = {
-    'loss_function': nn.MSELoss,
-    'optimizer': SGD,
-    'lr': 0.1,
-    'momentum': 0.9,
-    'num_of_epochs': 1000,
-}
 
 
-def train_model(model: nn.Module, conf: dict, x_train: Tensor, y_train: Tensor, x_test: Tensor, y_test: Tensor) -> tuple([nn.Module, list]):
-    losses = []
-    predictions = []
-    mses = []
-    test_mses = []
-    criterion = conf['loss_function']()
-    optimizer = conf['optimizer'](model.parameters(), lr=conf['lr'], momentum=conf['momentum'])
-
-    for epoch in range(conf['num_of_epochs']):
-        y_pred = model(x_train)
-        loss = criterion(y_pred, y_train)
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-
-        losses.append(loss.item())
-        predictions.append(y_pred)
-        mse = mean_squared_error(y_train.detach().numpy(), y_pred.detach().numpy())
-        mses.append(mse)
-        if (epoch + 1) % 100 == 0:
-            print('epoch:', epoch + 1, ',loss=', loss.item())
-
-        _, test_mse = test_model(model=model, x_test=x_test, y_test=y_test, loss_fn=criterion)
-        test_mses.append(test_mse)
-
-    scores = [losses, predictions, mses, test_mses]
-    return model, scores
+def train_model(
+        model: nn.Module,
+        optimizer: Optimizer,
+        loss_fn: nn.MSELoss,
+        x_train: Tensor, y_train: Tensor
+) -> float:
+    model.train()
+    optimizer.zero_grad()
+    y_pred = model(x_train)
+    loss = loss_fn(y_pred, y_train)
+    loss.backward()
+    optimizer.step()
+    return loss
 
 
-def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> tuple([nn.Module, list]):
+def test_model(model: nn.Module, x_test: Tensor, y_test: Tensor, loss_fn: nn.MSELoss) -> Tuple[float, Tensor]:
     model.eval()
-
-    with torch.no_grad():
+    with no_grad():
         y_pred = model(x_test)
         loss = loss_fn(y_pred, y_test)
+    return loss, y_pred
 
-    return model, loss
 
-
-def validate_model(model: nn.Module, x_test, y_test):
-    y_pred = model(x_test)
-    mse = mean_squared_error(y_test.detach().numpy(), y_pred.detach().numpy())
-    print(mse)
-    return mse
+def run_model(model: nn.Module, data: Tensor, num_of_epochs: int) -> [List, List, List]:
+    lr = 0.1
+    momentum = 0.9
+    train_losses = []
+    test_losses = []
+    predictions = []
+    loss_function = nn.MSELoss()
+    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
+    x_train, y_train, x_test, y_test = train_test_split(data, test_size=0.3)
+    for epoch in range(num_of_epochs):
+        train_loss = train_model(model, optimizer, loss_function, x_train, y_train)
+        test_loss, test_pred = test_model(model, x_test, y_test, loss_function)
+        train_losses.append(train_loss)
+        test_losses.append(test_loss)
+        predictions.append(test_pred)
+        if (epoch + 1) % 100 == 0:
+            print('epoch:', epoch + 1, ',train_loss=', train_loss)
+            print('epoch:', epoch + 1, ',test_loss=', test_loss)
+        # validation usage
+    return train_losses, test_losses, predictions, dict(x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test)
 
 
 # **Visualizing the plots:**
@@ -150,28 +141,24 @@ def validate_model(model: nn.Module, x_test, y_test):
 kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE'}
 
 
-def viz_epochs(num_of_epochs: int, other_axis: list, plot_test: bool, title: str, x_label: str, y_label: str):
+def viz_epochs(num_of_epochs: int,
+               other_axis: list,
+               plot_test: bool,
+               # title: str,
+               # x_label: str,
+               # y_label: str,
+               y_lim: tuple = (0.22, 0.28)
+               ):
     epochs = list(range(num_of_epochs))
     plt.plot(epochs, other_axis[0], 'orange', label='Train MSEs')
     if plot_test:
         plt.plot(epochs, other_axis[1], 'blue', label='Test MSEs', linestyle='--')
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.ylim([0.22, 0.28])
+    # plt.title(title)
+    # plt.xlabel(x_label)
+    # plt.ylabel(y_label)
+    plt.ylim(list(y_lim))
     plt.legend()
     plt.show()
-
-
-# def viz_epochs2(num_of_epochs: int, other_axis: list, title: str, x_label: str, y_label: str, ):
-#     epochs = list(range(num_of_epochs))
-#     plt.plot(epochs, other_axis)
-#     plt.plot(epochs, other_axis)
-#     plt.title(title)
-#     plt.xlabel(x_label)
-#     plt.ylabel(y_label)
-#     plt.legend()
-#     plt.show()
 
 
 # Build a new neural network and try overfitting your training set
@@ -200,13 +187,6 @@ class OverfitModel(nn.Module):
 
 
 # **Training and validation:**
-model_conf_overfit = {
-    'loss_function': nn.MSELoss,
-    'optimizer': SGD,
-    'lr': 0.1,
-    'momentum': 0.9,
-    'num_of_epochs': 10000,
-}
 
 # **Training and validation:**
 
@@ -219,27 +199,31 @@ model_conf_overfit = {
 
 
 def main():
-    torch.manual_seed(1202)
+    manual_seed(1202)
     data = generate_data()
     viz_data(*data)
     v_data = vectorize_data(*data)
-    reg_model = RegressionModel(2, [3, 3])
-    X_train, X_test, y_train, y_test = [convert_to_tensor(data_set) for data_set in
-                                        train_test_split(*v_data, test_size=0.3)]
-    trained_model, tr_scores = train_model(reg_model, model_conf, x_train=X_train, y_train=y_train,x_test=X_test,y_test=y_test)
+    regression_model = RegressionModel(2, [3, 3])
+    epochs = 1000
+    train_losses, test_losses, predictions, splited_data = run_model(model=regression_model, data=data,
+                                                                     num_of_epochs=epochs)
 
-    viz_epochs(model_conf['num_of_epochs'], [tr_scores[2], tr_scores[3]], plot_test=True, **kw)
-    # y_pred = trained_model(X_test)
+    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
 
-    # viz_data(X_test[:, 0], X_test[:, 1], y_test)
-    # viz_data(X_test[:, 0], X_test[:, 1], y_pred)
+    viz_data(splited_data['x_test'][:, 0], splited_data['x_test'][:, 1], splited_data['y_test'][:,0])
+    viz_data(splited_data['x_test'][:, 0], splited_data['x_test'][:, 1], predictions)
 
+
+def main_overfit():
     ## overfit part
+    data = generate_data()
+    v_data = vectorize_data(*data)
+    epochs = 10000
     reg_overfit_model = OverfitModel(2, [5, 5, 5])
-    trained_model_overfit, tr_scores_overfit = train_model(reg_overfit_model, model_conf_overfit, x_train=X_train, y_train=y_train, x_test=X_test,
-                                           y_test=y_test)
+    train_losses, test_losses, predictions, splited_data = run_model(reg_overfit_model, data=v_data,
+                                                                     num_of_epochs=epochs)
 
-    viz_epochs(model_conf_overfit['num_of_epochs'], [tr_scores_overfit[2], tr_scores_overfit[3]], plot_test=True, **kw)
+    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
 
 
 if __name__ == '__main__':
