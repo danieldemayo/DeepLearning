@@ -197,8 +197,6 @@ class OverfitModel(nn.Module):
 
 # **Training and validation:**
 
-# **Training and validation:**
-
 # **Visualizing the plots:**
 
 """
