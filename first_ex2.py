@@ -207,31 +207,17 @@ class OverfitModel(nn.Module):
 """
 
 
-def main():
+def run_script(regression_model: nn.Module, epochs: int):
     manual_seed(1202)
     data = generate_data()
     viz_data(*data[0], data[1])
-    regression_model = RegressionModel(2, [3, 3])
-    epochs = 1000
     train_losses, test_losses, splited_data = run_model(model=regression_model, data=data, num_of_epochs=epochs)
-
     viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
-
-    viz_preds(data, splited_data['pred'], )
-
-
-def main_overfit():
-    manual_seed(1202)
-    data = generate_data()
-    viz_data(*data[0], data[1])
-    regression_model = OverfitModel(2, [5, 5, 5])
-    epochs = 10000
-    train_losses, test_losses, splited_data = run_model(model=regression_model, data=data, num_of_epochs=epochs)
-
-    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
-
     viz_preds(data, splited_data['pred'], )
 
 
 if __name__ == '__main__':
-    main_overfit()
+    model1 = RegressionModel(2, [3, 3])
+    model2 = OverfitModel(2, [5, 5, 5])
+    run_script(model1, 1000)
+    run_script(model2, 10000)
