@@ -152,18 +152,12 @@ kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE'}
 def viz_epochs(num_of_epochs: int,
                other_axis: list,
                plot_test: bool,
-               # title: str,
-               # x_label: str,
-               # y_label: str,
-               y_lim: tuple = (0.22, 0.28)
+               y_lim: tuple
                ):
     epochs = list(range(num_of_epochs))
     plt.plot(epochs, other_axis[0], 'orange', label='Train MSEs')
     if plot_test:
         plt.plot(epochs, other_axis[1], 'blue', label='Test MSEs', linestyle='--')
-    # plt.title(title)
-    # plt.xlabel(x_label)
-    # plt.ylabel(y_label)
     plt.ylim(list(y_lim))
     plt.legend()
     plt.show()
@@ -204,11 +198,11 @@ class OverfitModel(nn.Module):
 """
 
 
-def run_script(regression_model: nn.Module, epochs: int):
+def run_script(regression_model: nn.Module, epochs: int, ylim: tuple = (0.22, 0.28)):
     manual_seed(1202)
     data = generate_data()
     train_losses, test_losses, splited_data = run_model(model=regression_model, data=data, num_of_epochs=epochs)
-    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
+    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, y_lim=ylim)
     viz_preds(data, splited_data['pred'], )
 
 
