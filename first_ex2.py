@@ -128,8 +128,7 @@ def run_model(model: nn.Module, data: Tuple[Tuple, NDArray], num_of_epochs: int)
     loss_function = nn.MSELoss()
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     x, fx = vectorize_data(*data[0], data[1])
-    x_train, x_test, y_train, y_test = (convert_to_tensor(v) for v in
-                                        train_test_split(x, fx, test_size=0.3, random_state=1))
+    x_train, x_test, y_train, y_test = map(convert_to_tensor, train_test_split(x, fx, test_size=0.3, random_state=1))
     pred = np.array([1])
     for epoch in range(num_of_epochs):
         train_loss = train_model(model, optimizer, loss_function, x_train, y_train)
@@ -137,7 +136,7 @@ def run_model(model: nn.Module, data: Tuple[Tuple, NDArray], num_of_epochs: int)
         train_losses.append(train_loss.item())
         test_losses.append(test_loss.item())
         pred = test_pred.detach().numpy()
-        if (epoch + 1) % 100 == 0:
+        if (epoch + 1) % 500 == 0:
             print('epoch:', epoch + 1, ',train_loss =', train_loss.item())
             print('epoch:', epoch + 1, ',test_loss =', test_loss.item())
         # validation usage
@@ -208,7 +207,6 @@ class OverfitModel(nn.Module):
 def run_script(regression_model: nn.Module, epochs: int):
     manual_seed(1202)
     data = generate_data()
-    viz_data(*data[0], data[1])
     train_losses, test_losses, splited_data = run_model(model=regression_model, data=data, num_of_epochs=epochs)
     viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
     viz_preds(data, splited_data['pred'], )
@@ -218,4 +216,4 @@ if __name__ == '__main__':
     model1 = RegressionModel(2, [3, 3])
     model2 = OverfitModel(2, [5, 5, 5])
     run_script(model1, 1000)
-    run_script(model2, 10000)
+    run_script(model2, 50000)
