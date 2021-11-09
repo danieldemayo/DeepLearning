@@ -15,7 +15,7 @@ Then, build your neural networks and find the architecture which gives you the b
 from typing import Tuple, List, Dict
 import numpy as np
 from numpy.typing import NDArray
-from torch import nn, from_numpy, Tensor, manual_seed, no_grad
+from torch import nn, from_numpy, Tensor, no_grad, manual_seed
 import matplotlib.pyplot as plt
 from torch.optim import SGD, Optimizer
 from sklearn.model_selection import train_test_split
@@ -84,13 +84,13 @@ class RegressionModel(nn.Module):
         self.lin2 = nn.Linear(num_neurons[0], num_neurons[1])
         self.lin3 = nn.Linear(num_neurons[1], 1)
 
-        self.relu = nn.ReLU()
-        self.sig = nn.Sigmoid()
+        self.relu = nn.LeakyReLU()
+        self.tanh = nn.Tanh()
 
     def forward(self, x: Tensor):
         x = self.relu(self.lin1(x))
-        x = self.sig(self.lin2(x))
-        x = self.sig(self.lin3(x))
+        x = self.tanh(self.lin2(x))
+        x = self.tanh(self.lin3(x))
         return x
 
 
@@ -128,8 +128,7 @@ def run_model(model: nn.Module, data: Tuple[Tuple, NDArray], num_of_epochs: int)
     loss_function = nn.MSELoss()
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     x, fx = vectorize_data(*data[0], data[1])
-    x_train, x_test, y_train, y_test = (convert_to_tensor(v) for v in
-                                        train_test_split(x, fx, test_size=0.3, random_state=1))
+    x_train, x_test, y_train, y_test = map(convert_to_tensor, train_test_split(x, fx, test_size=0.3, random_state=1))
     pred = np.array([1])
     for epoch in range(num_of_epochs):
         train_loss = train_model(model, optimizer, loss_function, x_train, y_train)
@@ -137,7 +136,7 @@ def run_model(model: nn.Module, data: Tuple[Tuple, NDArray], num_of_epochs: int)
         train_losses.append(train_loss.item())
         test_losses.append(test_loss.item())
         pred = test_pred.detach().numpy()
-        if (epoch + 1) % 100 == 0:
+        if (epoch + 1) % 1000 == 0:
             print('epoch:', epoch + 1, ',train_loss =', train_loss.item())
             print('epoch:', epoch + 1, ',test_loss =', test_loss.item())
         # validation usage
@@ -153,18 +152,12 @@ kw = {'title': 'Epochs Vs. MSE', 'x_label': 'Epochs', 'y_label': 'MSE'}
 def viz_epochs(num_of_epochs: int,
                other_axis: list,
                plot_test: bool,
-               # title: str,
-               # x_label: str,
-               # y_label: str,
-               y_lim: tuple = (0.22, 0.28)
+               y_lim: tuple
                ):
     epochs = list(range(num_of_epochs))
     plt.plot(epochs, other_axis[0], 'orange', label='Train MSEs')
     if plot_test:
         plt.plot(epochs, other_axis[1], 'blue', label='Test MSEs', linestyle='--')
-    # plt.title(title)
-    # plt.xlabel(x_label)
-    # plt.ylabel(y_label)
     plt.ylim(list(y_lim))
     plt.legend()
     plt.show()
@@ -184,14 +177,14 @@ class OverfitModel(nn.Module):
         self.lin3 = nn.Linear(num_neurons[1], num_neurons[2])
         self.lin4 = nn.Linear(num_neurons[2], 1)
 
-        self.relu = nn.ReLU()
-        self.sig = nn.Sigmoid()
+        self.relu = nn.RReLU()
+        self.tanh = nn.Tanh()
 
     def forward(self, x):
         x = self.relu(self.lin1(x))
-        x = self.sig(self.lin2(x))
-        x = self.sig(self.lin3(x))
-        x = self.sig(self.lin4(x))
+        x = self.tanh(self.lin2(x))
+        x = self.tanh(self.lin3(x))
+        x = self.tanh(self.lin4(x))
         return x
 
 
@@ -205,17 +198,16 @@ class OverfitModel(nn.Module):
 """
 
 
-def run_script(regression_model: nn.Module, epochs: int):
+def run_script(regression_model: nn.Module, epochs: int, ylim: tuple = (0.22, 0.28)):
     manual_seed(1202)
     data = generate_data()
-    viz_data(*data[0], data[1])
     train_losses, test_losses, splited_data = run_model(model=regression_model, data=data, num_of_epochs=epochs)
-    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, )
+    viz_epochs(num_of_epochs=epochs, other_axis=[train_losses, test_losses], plot_test=True, y_lim=ylim)
     viz_preds(data, splited_data['pred'], )
 
 
 if __name__ == '__main__':
-    model1 = RegressionModel(2, [3, 3])
-    model2 = OverfitModel(2, [5, 5, 5])
-    run_script(model1, 1000)
-    run_script(model2, 10000)
+    model1 = RegressionModel(2, [20, 30])
+    model2 = OverfitModel(2, [30, 50, 70])
+    run_script(model1, 1000, (0, 0.25))
+    run_script(model2, 100000, (0.0, 0.004))
