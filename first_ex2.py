@@ -15,7 +15,7 @@ Then, build your neural networks and find the architecture which gives you the b
 from typing import Tuple, List, Dict
 import numpy as np
 from numpy.typing import NDArray
-from torch import nn, from_numpy, Tensor, manual_seed, no_grad
+from torch import nn, from_numpy, Tensor, no_grad, manual_seed
 import matplotlib.pyplot as plt
 from torch.optim import SGD, Optimizer
 from sklearn.model_selection import train_test_split
@@ -84,13 +84,13 @@ class RegressionModel(nn.Module):
         self.lin2 = nn.Linear(num_neurons[0], num_neurons[1])
         self.lin3 = nn.Linear(num_neurons[1], 1)
 
-        self.relu = nn.ReLU()
-        self.sig = nn.Sigmoid()
+        self.relu = nn.LeakyReLU()
+        self.tanh = nn.Tanh()
 
     def forward(self, x: Tensor):
         x = self.relu(self.lin1(x))
-        x = self.sig(self.lin2(x))
-        x = self.sig(self.lin3(x))
+        x = self.tanh(self.lin2(x))
+        x = self.tanh(self.lin3(x))
         return x
 
 
@@ -136,7 +136,7 @@ def run_model(model: nn.Module, data: Tuple[Tuple, NDArray], num_of_epochs: int)
         train_losses.append(train_loss.item())
         test_losses.append(test_loss.item())
         pred = test_pred.detach().numpy()
-        if (epoch + 1) % 500 == 0:
+        if (epoch + 1) % 1000 == 0:
             print('epoch:', epoch + 1, ',train_loss =', train_loss.item())
             print('epoch:', epoch + 1, ',test_loss =', test_loss.item())
         # validation usage
@@ -177,14 +177,14 @@ class OverfitModel(nn.Module):
         self.lin3 = nn.Linear(num_neurons[1], num_neurons[2])
         self.lin4 = nn.Linear(num_neurons[2], 1)
 
-        self.relu = nn.ReLU()
-        self.sig = nn.Sigmoid()
+        self.relu = nn.RReLU()
+        self.tanh = nn.Tanh()
 
     def forward(self, x):
         x = self.relu(self.lin1(x))
-        x = self.sig(self.lin2(x))
-        x = self.sig(self.lin3(x))
-        x = self.sig(self.lin4(x))
+        x = self.tanh(self.lin2(x))
+        x = self.tanh(self.lin3(x))
+        x = self.tanh(self.lin4(x))
         return x
 
 
@@ -207,7 +207,7 @@ def run_script(regression_model: nn.Module, epochs: int, ylim: tuple = (0.22, 0.
 
 
 if __name__ == '__main__':
-    model1 = RegressionModel(2, [3, 3])
-    model2 = OverfitModel(2, [5, 5, 5])
-    run_script(model1, 1000)
-    run_script(model2, 50000)
+    model1 = RegressionModel(2, [20, 30])
+    model2 = OverfitModel(2, [30, 50, 70])
+    run_script(model1, 1000, (0, 0.25))
+    run_script(model2, 100000, (0.0, 0.004))
